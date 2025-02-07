@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Kanban Board</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0066ff;
+            --secondary-color: #f0f2f5;
+            --text-primary: #000000; /* Default readable black text */
+            --text-secondary: #6b778c;
+            --text-light: #ffffff;
+            --background-light: #ffffff;
+            --background-dark: #121212;
+            --task-bg-light: #ffffff;
+            --task-bg-dark: #252525;
+            --rain-color-light: rgba(135, 206, 250, 0.7);
+            --rain-color-dark: rgba(255, 255, 255, 0.3);
+            --transition-speed: 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: var(--background-light);
+            color: var(--text-primary);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', sans-serif;
+            transition: background var(--transition-speed), color var(--transition-speed);
+        }
+
+        body.night-mode {
+            background: var(--background-dark);
+            color: var(--text-light);
+        }
+
+        body.night-mode .column {
+            background: var(--task-bg-dark);
+        }
+
+        body.light-mode .header,
+        body.light-mode .task {
+            background: white;
+            color: var(--text-primary);
+        }
+
+        body.night-mode .header {
+            background: #000000;
+            color: #f5f5f5;
+        }
+
+        .task {
+            background: var(--task-bg-light);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: background var(--transition-speed), color var(--transition-speed);
+        }
+
+        .input-group i {
+            color: var(--text-primary); /* Improve visibility of input icons */
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeIn 0.5s ease-out;
+            position: relative;
+        }
+
+        body.night-mode .task {
+            background: var(#dfe1e6); /* Lighter background for better contrast */
+            color: var(#dfe1e6);       /* Light text color for readability */
+            border: 1px solid var(--task-border-dark); /* Subtle border for task separation */
+        }
+
+        body.night-mode .task-count {
+            color: #000000;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            transition: all var(--transition-speed);
+        }
+
+
+        /* Rain Effect */
+        .rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+            display: none; /* Hidden by default */
+        }
+
+        .raindrop {
+            position: absolute;
+            width: 2px;
+            height: 50px;
+            background: var(--rain-color-light);
+            animation: fall linear infinite;
+            filter: blur(1px);
+            opacity: 0.7;
+        }
+
+        body.night-mode .raindrop {
+            background: var(--rain-color-dark);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow-md);
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 12px;
+            color: var(--text-secondary);
+        }
+
+        input, select, button {
+            padding: 10px 15px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all var(--transition-speed);
+        }
+
+        input[type="text"], select {
+            padding-left: 35px;
+            width: 200px;
+            background: #f4f5f7;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0,102,255,0.1);
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #0052cc;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .column {
+            background: var(--secondary-color);
+            padding: 15px;
+            border-radius: 10px;
+            transition: background var(--transition-speed);
+        }
+
+
+        .column-header {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-count {
+            background: #dfe1e6;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            transition: all var(--transition-speed);
+        }
+
+        .task {
+            background: var(--task-bg-light);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: background var(--transition-speed), color var(--transition-speed);
+        }
+
+        .task:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .task-title {
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .task-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .task-labels {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .label {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .priority {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .priority.high {
+            background: #ffebe6;
+            color: var(--danger-color);
+        }
+
+        .priority.medium {
+            background: #fffae6;
+            color: var(--warning-color);
+        }
+
+        .priority.low {
+            background: #e3fcef;
+            color: var(--success-color);
+        }
+
+        .task-actions {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+        }
+
+        .task:hover .task-actions {
+            opacity: 1;
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all var(--transition-speed);
+        }
+
+        .action-button:hover {
+            color: var(--primary-color);
+            transform: scale(1.1);
+        }
+
+        .due-date {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+        }
+
+        .due-date.overdue {
+            color: var(--danger-color);
+            animation: shake 0.5s ease-in-out;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            padding: 10px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            background: #f4f5f7;
+            font-family: inherit;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0,102,255,0.1);
+        }
+
+        .column.drag-over {
+            background: #dfe1e6;
+            box-shadow: var(--shadow-md) inset;
+        }
+
+        @media (max-width: 768px) {
+            .board {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            .controls {
+                width: 100%;
+                justify-content: center;
+            }
+
+            input[type="text"], select {
+                width: 100%;
+            }
+        }
+
+         @keyframes fall {
+            from {
+                transform: translateY(-100%);
+            }
+            to {
+                transform: translateY(100vh);
+            }
+        }
+
+        button {
+            background: var(--primary-color);
+            color: var(--text-light);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0052cc;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="rain" id="rainEffect"></div>
+        <div class="header">
+            <h1>Kanban Board</h1>
+            <div class="controls">
+                <button id="toggleNightMode" class="toggle-night-mode">Toggle Night Mode</button>
+            </div>
+            <div class="controls">
+                <div class="input-group">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search" placeholder="Search tasks...">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-filter"></i>
+                    <select id="priorityFilter">
+                        <option value="all">All Priorities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <button id="addTask">
+                    <i class="fas fa-plus"></i>
+                    Add Task
+                </button>
+            </div>
+        </div>
+        <div class="board">
+            <div class="column" data-column="todo">
+                <div class="column-header">
+                    <span>To Do</span>
+                    <span class="task-count">0</span>
+                </div>
+            </div>
+            <div class="column" data-column="inProgress">
+                <div class="column-header">
+                    <span>In Progress</span>
+                    <span class="task-count">0</span>
+                </div>
+            </div>
+            <div class="column" data-column="done">
+                <div class="column-header">
+                    <span>Done</span>
+                    <span class="task-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Task</h2>
+                <button class="action-button" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal-form" id="taskForm">
+                <div class="form-group">
+                    <label for="taskTitle">Title</label>
+                    <input type="text" id="taskTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Description</label>
+                    <textarea id="taskDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="taskPriority">Priority</label>
+                    <select id="taskPriority">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskDueDate">Due Date</label>
+                    <input type="date" id="taskDueDate">
+                </div>
+                <div class="form-group">
+                    <label for="taskLabels">Labels (comma-separated)</label>
+                    <input type="text" id="taskLabels" placeholder="UI, Backend, Bug Fix">
+                </div>
+                <button type="submit">Save Task</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        class KanbanBoard {
+            constructor() {
+                this.tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                this.draggedTask = null;
+                this.searchTerm = '';
+                this.priorityFilter = 'all';
+                this.editingTaskId = null;
+                
+                this.initializeEventListeners();
+                this.render();
+            }
+
+            initializeEventListeners() {
+                // Modal elements
+                const modal = document.getElementById('taskModal');
+                const closeModal = document.getElementById('closeModal');
+                const taskForm = document.getElementById('taskForm');
+
+                // Button listeners
+                document.getElementById('addTask').addEventListener('click', () => {
+                    this.editingTaskId = null;
+                    document.getElementById('modalTitle').textContent = 'Add New Task';
+                    taskForm.reset();
+                    modal.style.display = 'flex';
+                });
+
+                closeModal.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+
+                // Form submission
+                taskForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleTaskFormSubmit();
+                });
+
+                // Filter listeners
+                document.getElementById('search').addEventListener('input', (e) => {
+                    this.searchTerm = e.target.value.toLowerCase();
+                    this.render();
+                });
+
+                document.getElementById('priorityFilter').addEventListener('change', (e) => {
+                    this.priorityFilter = e.target.value;
+                    this.render();
+                });
+
+                // Click outside modal to close
+                window.addEventListener('click', (e) => {
+                                        if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+
+                // Drag and drop events
+                const columns = document.querySelectorAll('.column');
+                columns.forEach(column => {
+                    column.addEventListener('dragover', (e) => this.handleDragOver(e, column));
+                    column.addEventListener('drop', (e) => this.handleDrop(e, column));
+                });
+            }
+
+            handleTaskFormSubmit() {
+                const taskTitle = document.getElementById('taskTitle').value;
+                const taskDescription = document.getElementById('taskDescription').value;
+                const taskPriority = document.getElementById('taskPriority').value;
+                const taskDueDate = document.getElementById('taskDueDate').value;
+                const taskLabels = document.getElementById('taskLabels').value.split(',').map(label => label.trim());
+
+                const newTask = {
+                    id: this.editingTaskId || Date.now(),
+                    title: taskTitle,
+                    description: taskDescription,
+                    priority: taskPriority,
+                    dueDate: taskDueDate,
+                    labels: taskLabels,
+                    column: this.editingTaskId ? this.tasks.find(task => task.id === this.editingTaskId).column : 'todo',
+                };
+
+                if (this.editingTaskId) {
+                    this.tasks = this.tasks.map(task => task.id === this.editingTaskId ? newTask : task);
+                } else {
+                    this.tasks.push(newTask);
+                }
+
+                this.saveTasks();
+                this.render();
+                document.getElementById('taskModal').style.display = 'none';
+            }
+
+            saveTasks() {
+                localStorage.setItem('tasks', JSON.stringify(this.tasks));
+            }
+
+            render() {
+            const columns = {
+                todo: document.querySelector('[data-column="todo"]'),
+                inProgress: document.querySelector('[data-column="inProgress"]'),
+                done: document.querySelector('[data-column="done"]'),
+            };
+
+            // Clear existing tasks in columns
+            Object.values(columns).forEach(column => column.querySelectorAll('.task').forEach(task => task.remove()));
+
+            const filteredTasks = this.tasks
+                .filter(task => task.title.toLowerCase().includes(this.searchTerm))
+                .filter(task => this.priorityFilter === 'all' || task.priority === this.priorityFilter);
+
+            filteredTasks.forEach(task => {
+                // Validate task.column and provide a fallback
+                const columnElement = columns[task.column];
+                if (!columnElement) {
+                    console.warn(`Invalid column "${task.column}" for task:`, task);
+                    task.column = 'todo'; // Default to 'todo' if column is invalid
+                }
+                const validColumnElement = columns[task.column];
+                if (validColumnElement) {
+                    const taskElement = this.createTaskElement(task);
+                    validColumnElement.appendChild(taskElement);
+                }
+            });
+
+            // Update task counts
+            Object.keys(columns).forEach(columnKey => {
+                const taskCount = columns[columnKey].querySelector('.task-count');
+                taskCount.textContent = filteredTasks.filter(task => task.column === columnKey).length;
+            });
+        }
+
+
+            createTaskElement(task) {
+            const taskElement = document.createElement('div');
+            taskElement.classList.add('task');
+            taskElement.setAttribute('draggable', true);
+            taskElement.dataset.id = task.id;
+
+            // Add due date class if overdue
+            const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
+            const dueDateClass = isOverdue ? 'overdue' : '';
+
+            // Safely handle undefined labels
+            const labelsHtml = (task.labels || []).map(label => `
+                <span class="label" style="background: #f0f0f0">${label}</span>
+            `).join('');
+
+            taskElement.innerHTML = `
+                <div class="task-title">${task.title}</div>
+                <div class="task-labels">${labelsHtml}</div>
+                <div class="task-description">${task.description}</div>
+                <div class="task-meta">
+                    <span class="priority ${task.priority}">
+                        <i class="fas fa-flag"></i>
+                        ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                    </span>
+                    ${task.dueDate ? `
+                        <span class="due-date ${dueDateClass}">
+                            <i class="far fa-calendar"></i>
+                            ${new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                    ` : ''}
+                </div>
+                <div class="task-actions">
+                    <button class="action-button edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-button delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+
+            // Add drag and drop listeners
+            taskElement.addEventListener('dragstart', (e) => this.handleDragStart(e, task));
+            taskElement.addEventListener('dragend', (e) => this.handleDragEnd(e));
+
+            // Add action button listeners after creating the element
+            const editButton = taskElement.querySelector('.edit');
+            const deleteButton = taskElement.querySelector('.delete');
+            
+            editButton.addEventListener('click', () => this.handleEditTask(task.id));
+            deleteButton.addEventListener('click', () => this.handleDeleteTask(task.id));
+
+            return taskElement;
+        }
+
+
+            handleEditTask(taskId) {
+                this.editingTaskId = taskId;
+                const task = this.tasks.find(task => task.id === taskId);
+
+                document.getElementById('modalTitle').textContent = 'Edit Task';
+                document.getElementById('taskTitle').value = task.title;
+                document.getElementById('taskDescription').value = task.description;
+                document.getElementById('taskPriority').value = task.priority;
+                document.getElementById('taskDueDate').value = task.dueDate;
+                document.getElementById('taskLabels').value = task.labels.join(', ');
+
+                document.getElementById('taskModal').style.display = 'flex';
+            }
+
+            handleDeleteTask(taskId) {
+                this.tasks = this.tasks.filter(task => task.id !== taskId);
+                this.saveTasks();
+                this.render();
+            }
+
+            handleDragStart(e, task) {
+                this.draggedTask = task;
+                e.target.classList.add('dragging');
+            }
+
+            handleDragEnd(e) {
+                e.target.classList.remove('dragging');
+                this.draggedTask = null;
+            }
+
+            handleDragOver(e, column) {
+                e.preventDefault();
+                column.classList.add('drag-over');
+            }
+
+            handleDrop(e, column) {
+                e.preventDefault();
+                const columnName = column.dataset.column;
+                if (this.draggedTask) {
+                    this.tasks = this.tasks.map(task => task.id === this.draggedTask.id ? { ...task, column: columnName } : task);
+                    this.saveTasks();
+                    this.render();
+                }
+                column.classList.remove('drag-over');
+            }
+        }
+
+        // Night Mode Toggle
+        const toggleNightMode = document.getElementById('toggleNightMode');
+        const rainEffect = document.getElementById('rainEffect');
+
+        toggleNightMode.addEventListener('click', () => {
+            document.body.classList.toggle('night-mode');
+
+            // Toggle Rain Effect
+            if (document.body.classList.contains('night-mode')) {
+                rainEffect.style.display = 'block';
+            } else {
+                rainEffect.style.display = 'none';
+            }
+        });
+
+        // Rain Effect
+        for (let i = 0; i < 100; i++) {
+            const drop = document.createElement('div');
+            drop.classList.add('raindrop');
+            drop.style.left = Math.random() * 100 + '%';
+            drop.style.animationDuration = Math.random() * 2 + 1 + 's';
+            drop.style.animationDelay = Math.random() * 2 + 's';
+            rainEffect.appendChild(drop);
+        }
+        new KanbanBoard();
+    </script>
+</body>
+</html>
